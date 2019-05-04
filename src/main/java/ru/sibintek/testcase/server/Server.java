@@ -41,8 +41,8 @@ public class Server {
         int messagesPerSecond = ConsoleHelper.readInt();
         try (ServerSocket serverSocket = new ServerSocket(serverPort)) {
             Runnable generatorTask = new Generator(messages,messagesPerSecond);
-            scheduledExecutor.scheduleAtFixedRate(generatorTask, 1, 1, TimeUnit.SECONDS);
             ConsoleHelper.writeMessage("Сервер запущен..");
+            scheduledExecutor.scheduleAtFixedRate(generatorTask, 1, 1, TimeUnit.SECONDS);
             CompletableFuture.runAsync(this::sendBroadcastMessage);
             while (true) {
                 //Listen
@@ -62,7 +62,7 @@ public class Server {
     private void sendBroadcastMessage() {
         final CompletionService<Boolean> completionService = new ExecutorCompletionService<>(sendExecutor);
         while (true) {
-            if (!connectionMap.isEmpty()) {
+            if (!connectionMap.isEmpty() && !messages.isEmpty()) {
                 Message message = messages.peek();
                 List<Future<Boolean>> futures = connectionMap.entrySet().stream()
                         .map((entry) -> completionService

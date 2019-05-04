@@ -125,7 +125,7 @@ public class ClientA {
             onShutDownLogic();
             while (true) {
                 Message message = connection.receive();
-                if (message.getType() != null && message.getType() == MessageType.SERVER_PUSH) {
+                if (message != null && message.getType() != null && message.getType() == MessageType.SERVER_PUSH) {
                     //CompletableFuture.runAsync(() -> processIncomingMessage(message));
                     processIncomingMessage(message);
                     sendResponse(message.getId());
