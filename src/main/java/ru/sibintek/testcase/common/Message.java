@@ -1,6 +1,7 @@
 package ru.sibintek.testcase.common;
 
 import java.io.Serializable;
+import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 
@@ -48,5 +49,31 @@ public class Message implements Serializable {
         String data = UUID.randomUUID().toString();
         MessagePriority priority = MessagePriority.values()[new Random().nextInt(3)];
         return new Message(priority, data, MessageType.SERVER_PUSH);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Message)) return false;
+        Message message = (Message) o;
+        return Objects.equals(getId(), message.getId()) &&
+                getPriority() == message.getPriority() &&
+                getType() == message.getType() &&
+                Objects.equals(getData(), message.getData());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getId(), getPriority(), getType(), getData());
+    }
+
+    @Override
+    public String toString() {
+        return "Message{" +
+                "id='" + id + '\'' +
+                ", priority=" + priority +
+                ", type=" + type +
+                ", data='" + data + '\'' +
+                '}';
     }
 }

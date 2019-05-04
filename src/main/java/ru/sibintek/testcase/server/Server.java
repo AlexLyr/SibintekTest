@@ -11,7 +11,6 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
@@ -20,9 +19,9 @@ public class Server {
 
     private final ScheduledExecutorService scheduledExecutor = Executors.newScheduledThreadPool(1);
 
-    private final ExecutorService sendExecutor = Executors.newFixedThreadPool(4);
+    private final ExecutorService sendExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
-    private static PriorityQueue<Message> messages = new PriorityQueue<>((msg1, msg2) -> {
+    private static PriorityBlockingQueue<Message> messages = new PriorityBlockingQueue<>(150, (msg1, msg2) -> {
         if (msg1.getPriority().getOrder() == msg2.getPriority().getOrder()) return 0;
         return msg1.getPriority().getOrder() < msg2.getPriority().getOrder() ? -1 : 1; //PriorityQueue ставит в хэд самый маленький элемент, поэтому реверсный порядок
     });
@@ -41,7 +40,7 @@ public class Server {
         ConsoleHelper.writeMessage("Введите количество генерируемых сообщений в секунду:");
         int messagesPerSecond = ConsoleHelper.readInt();
         try (ServerSocket serverSocket = new ServerSocket(serverPort)) {
-            Runnable generatorTask = new Generator(messagesPerSecond);
+            Runnable generatorTask = new Generator(messages,messagesPerSecond);
             scheduledExecutor.scheduleAtFixedRate(generatorTask, 1, 1, TimeUnit.SECONDS);
             ConsoleHelper.writeMessage("Сервер запущен..");
             CompletableFuture.runAsync(this::sendBroadcastMessage);
