@@ -1,6 +1,5 @@
 package ru.sibintek.testcase;
 
-import com.sun.xml.internal.bind.marshaller.MinimumEscapeHandler;
 import org.junit.Assert;
 import org.junit.Test;
 import ru.sibintek.testcase.common.Message;

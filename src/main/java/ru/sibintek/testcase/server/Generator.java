@@ -53,56 +53,48 @@ public class Generator implements Runnable {
 
     /**
      * Метод чтения сообщения из файла
+     *
      * @param tempDir директория для поиска сообщений
      * @return Message
      */
     //TODO Refactor this ужас
     private Optional<Message> readFirstMessageFromDir(Path tempDir) {
         Path earliestFile = null;
+        InputStream fis = null;
+        ObjectInputStream ois = null;
         try {
             earliestFile = Files.list(tempDir)
                     .findFirst().orElse(null);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        if (earliestFile != null) {
-            InputStream fis = null;
-            try {
+            if (earliestFile != null) {
                 fis = Files.newInputStream(earliestFile);
-            } catch (IOException e) {
-                e.printStackTrace();
             }
-            ObjectInputStream ois = null;
-            try {
-                ois = new ObjectInputStream(fis);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            try {
-                return Optional.ofNullable((Message) (ois != null ? ois.readObject() : null));
-            } catch (IOException ignored) {
-            } catch (ClassNotFoundException e) {
-                return Optional.empty();
-            } finally {
+            ois = new ObjectInputStream(fis);
+            if (earliestFile != null) {
                 earliestFile.toFile().delete();
-                try {
-                    if (ois != null) {
-                        ois.close();
-                    }
-                    if (fis != null) {
-                        fis.close();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
+            }
+            return Optional.ofNullable((Message) ois.readObject());
+        } catch (IOException | ClassNotFoundException e) {
+            return Optional.empty();
+        } finally {
+            try {
+                if (ois != null) {
+                    ois.close();
                 }
+                if (fis != null) {
+                    fis.close();
+                }
+            } catch (IOException e) {
+                System.exit(-1);
+                e.printStackTrace();
             }
         }
-        return Optional.empty();
     }
+
 
     /**
      * Сохраняем сообщение в файл таким образом, чтобы файл назывался: уровень приоритета + время создания,
      * чтобы поиск по файлам при чтении самого приоритетного сообщения занимал константное время
+     *
      * @param msg сообщение
      */
     private void saveMessageToFile(Message msg) {
