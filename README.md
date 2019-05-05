@@ -1,4 +1,7 @@
 # SibintekTest
+### Задание №1
+[![Alt text](https://github.com/AlexLyr/SibintekTest/blob/master/Задание%20для%20Java%20разработчика.docx)](https://github.com/AlexLyr/SibintekTest/blob/master/Задание%20для%20Java%20разработчика.docx)
+
 
 Так как мне долго не отвечали как должны выглядеть сервисы, а в задании было сказано использовать только native java,
 то я сделал на сокетах, один класс сервера, и два одинаковых класса ClientA и ClientB, чтобы было удобно из IDEA запускать
@@ -8,8 +11,11 @@
 
 
 ### Задание №2 (SQL)
-####Задача 1
-```sql92
+[![Alt text](https://github.com/AlexLyr/SibintekTest/blob/master/Задание%20по%20БД.docx)](https://github.com/AlexLyr/SibintekTest/blob/master/Задание%20по%20БД.docx)
+
+
+#### Задача 1
+```sql
 create index on cities (name);
 delete
 from cities a
