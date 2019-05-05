@@ -3,4 +3,4 @@
 то я сделал на сокетах, один класс сервера, и два одинаковых класса ClientA и ClientB, чтобы было удобно из IDEA запускать
 
 ### Схема проекта
-[![alt text][image] [image]:https://github.com/AlexLyr/SibintekTest/blob/master/scheme.png "tooltip"
+[![Alt text](https://github.com/AlexLyr/SibintekTest/blob/master/scheme.png)](https://github.com/AlexLyr/SibintekTest/blob/master/scheme.png)
