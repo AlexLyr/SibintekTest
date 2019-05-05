@@ -11,7 +11,7 @@ public class Message implements Serializable {
     private final MessageType type;
     private final String data;
 
-    public Message(MessagePriority priority, String data, MessageType type) {
+    private Message(MessagePriority priority, String data, MessageType type) {
         this.priority = priority;
         this.data = data;
         this.type = type;

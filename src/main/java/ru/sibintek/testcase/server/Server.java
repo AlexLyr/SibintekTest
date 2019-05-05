@@ -14,44 +14,49 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
+/**
+ * Класс сервера, отвечает за регистрацию клиентов и отправку сообщений
+ */
 public class Server {
     private static Map<String, Connection> connectionMap = new ConcurrentHashMap<>();
 
-    private final ScheduledExecutorService scheduledExecutor = Executors.newScheduledThreadPool(1);
+    private final ScheduledExecutorService generateMessagesExecutor = Executors.newScheduledThreadPool(1);
 
     private final ExecutorService sendExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
-    private static PriorityBlockingQueue<Message> messages = new PriorityBlockingQueue<>(150, (msg1, msg2) -> {
+    private static PriorityBlockingQueue<Message> messagesBuffer = new PriorityBlockingQueue<>(150, (msg1, msg2) -> {
         if (msg1.getPriority().getOrder() == msg2.getPriority().getOrder()) return 0;
         return msg1.getPriority().getOrder() < msg2.getPriority().getOrder() ? -1 : 1; //PriorityQueue ставит в хэд самый маленький элемент, поэтому реверсный порядок
     });
 
-    static void addMessageToQueue(Message msg) {
-        messages.add(msg);
-    }
+
 
     public static void main(String[] args) throws IOException {
         new Server().startServer();
     }
 
+    /**
+     * Стартует все потоки, необходимые для работы сервера
+     * @throws IOException бросает исключение при ошибке регистрации клиента
+     */
     private void startServer() throws IOException {
         ConsoleHelper.writeMessage("Введите порт сервера:");
         int serverPort = ConsoleHelper.readInt();
         ConsoleHelper.writeMessage("Введите количество генерируемых сообщений в секунду:");
         int messagesPerSecond = ConsoleHelper.readInt();
         try (ServerSocket serverSocket = new ServerSocket(serverPort)) {
-            Runnable generatorTask = new Generator(messages,messagesPerSecond);
+            Runnable startGenerateMessagesTask = new Generator(messagesBuffer,messagesPerSecond);
             ConsoleHelper.writeMessage("Сервер запущен..");
-            scheduledExecutor.scheduleAtFixedRate(generatorTask, 1, 1, TimeUnit.SECONDS);
+            generateMessagesExecutor.scheduleAtFixedRate(startGenerateMessagesTask, 1, 1, TimeUnit.SECONDS);
             CompletableFuture.runAsync(this::sendBroadcastMessage);
             while (true) {
-                //Listen
+                //Слушаем
                 try {
                     Socket socket = serverSocket.accept();
                     Handler handler = new Handler(socket);
                     new Thread(handler).start();
                 } catch (IOException e) {
-                    scheduledExecutor.shutdown();
+                    generateMessagesExecutor.shutdown();
                     e.printStackTrace();
                     break;
                 }
@@ -59,30 +64,40 @@ public class Server {
         }
     }
 
+    /**
+     * Метод отправки сообщений всем зарегестрированным клиентам
+     * Асинхронно отправляет сообщение каждому клиенту
+     */
     private void sendBroadcastMessage() {
         final CompletionService<Boolean> completionService = new ExecutorCompletionService<>(sendExecutor);
         while (true) {
-            if (!connectionMap.isEmpty() && !messages.isEmpty()) {
-                Message message = messages.peek();
+            if (!connectionMap.isEmpty() && !messagesBuffer.isEmpty()) {
+                Message message = messagesBuffer.peek();
                 List<Future<Boolean>> futures = connectionMap.entrySet().stream()
                         .map((entry) -> completionService
                                 .submit(() -> sendMessage(entry.getKey(), entry.getValue(), message)))
                         .collect(Collectors.toList());
                 boolean isMessageProcessedWithAllServices = checkIfAllServicesGetMessage(futures, completionService);
                 if (isMessageProcessedWithAllServices) {
-                    messages.poll();
+                    messagesBuffer.poll();
                 }
             }
         }
     }
 
-
+    /**
+     * Проверяем все ли сервисы успешно обработали сообщение
+     * @param futures ссылки на отложенный результат отправки
+     * @param completionService сервис исполнения
+     * @return boolean
+     */
     private Boolean checkIfAllServicesGetMessage(List<Future<Boolean>> futures, CompletionService<Boolean> completionService) {
         //Можно собирать коннекты от которых не удалось получить ответ, пробовать послать еще раз, или замутить какую нибудь логику по проверке
         //хартбита, но сейчас просто будем послыать всем заново, если кто-то не получил (at least one доставка)
         boolean isAllServicesGetMessage = true;
         while (!futures.isEmpty()) {
             try {
+                //Чтобы не блокировать получение результатов на каждой future, считаем задачу не завершенной, если по истечении 5 секунд нет результата
                 Future<Boolean> future = completionService.poll(5, TimeUnit.SECONDS);
                 if (future == null) {
                     futures.forEach(f -> f.cancel(true));
@@ -94,21 +109,31 @@ public class Server {
                     isAllServicesGetMessage = false;
                 }
             } catch (ExecutionException | InterruptedException e) {
-
                 return false;
             }
         }
         return isAllServicesGetMessage;
     }
 
+    /**
+     * Метод отправки сообщения клиенту
+     * @param serviceName имя клиента
+     * @param connection соединение
+     * @param message сообщение
+     * @return boolean true - доставлено, false - нет
+     * @throws IOException ошибка отправки/получения
+     * @throws ClassNotFoundException ошибка чтения сообщения
+     */
     private boolean sendMessage(String serviceName, Connection connection, Message message) throws IOException, ClassNotFoundException {
         try {
             connection.send(message);
             Message receive = connection.receive();
+            //ждем ответ и проверяем тоже самое ли было обработано сообщение
             if (receive.getType() == MessageType.RESPONSE) {
                 String receiveDataId = receive.getData();
                 return message.getId().equals(receiveDataId);
             }
+            //если клиент "отвалился" то выкидываем его из списка доступных
             if (receive.getType() == MessageType.DEREGISTER) {
                 connectionMap.remove(serviceName);
                 return true;
@@ -122,6 +147,9 @@ public class Server {
         return false;
     }
 
+    /**
+     * Класс, отвечающий за обмен информацией с каждым отдельным клиентом
+     */
     private static class Handler implements Runnable {
         private Socket socket;
 
@@ -147,6 +175,13 @@ public class Server {
             this.socket = socket;
         }
 
+        /**
+         * Метод, отвечающий за регистрацию клиента
+         * @param connection соединение
+         * @return уникальное имя клиента
+         * @throws IOException ошибка регистрации
+         * @throws ClassNotFoundException ошибка чтения сообщения
+         */
         private String serverHandshake(Connection connection) throws IOException, ClassNotFoundException {
             while (true) {
                 // Сформировать и отправить команду на проверку сервиса
@@ -169,8 +204,16 @@ public class Server {
             }
         }
 
+        /**
+         * Метод отвечающий за обработку сообщений от клиента
+         * @param connection соединение
+         * @param serviceName имя клиента
+         * @throws IOException ошибка принятия сообщения
+         * @throws ClassNotFoundException ошибка чтения сообщения
+         */
         private void serverMainLoop(Connection connection, String serviceName) throws IOException, ClassNotFoundException {
             while (true) {
+                //Пример
                 /*Message message = connection.receive();
                 if (message.getType() == MessageType.RESPONSE) {
                     String s = serviceName + ": " + message.getData();

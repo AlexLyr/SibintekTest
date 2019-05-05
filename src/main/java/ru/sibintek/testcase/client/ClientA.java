@@ -14,6 +14,10 @@ import static ru.sibintek.testcase.client.ClientUtils.getServerAddress;
 import static ru.sibintek.testcase.client.ClientUtils.getServerPort;
 
 @SuppressWarnings("Duplicates")
+/**
+ * Класс клиента
+ * Всего два одинаковых класса, для удобства запуска
+ */
 public class ClientA {
     private volatile boolean clientConnected;
 
@@ -25,7 +29,6 @@ public class ClientA {
     private Thread getSocketThread() {
         Thread socketThread = new Thread(new SocketThread());
         socketThread.setDaemon(true); //Чтобы сокет тушился при завершении главного потока
-        //Runtime.getRuntime().addShutdownHook(new ClientShutDownHook());
         return socketThread;
     }
 
@@ -45,13 +48,13 @@ public class ClientA {
         } else {
             ConsoleHelper.writeMessage("Произошла ошибка во время работы клиента.");
         }
-
         while (clientConnected) {
             String message = ConsoleHelper.readString();
             if (message.equals("exit"))
                 break;
         }
     }
+
 
     public class SocketThread implements Runnable {
 
@@ -61,12 +64,11 @@ public class ClientA {
             try {
                 String serverAddress = getServerAddress();
                 int serverPort = getServerPort();
-
                 Socket socket = new Socket(serverAddress, serverPort);
                 this.connection = new Connection(socket);
                 clientHandshake();
                 clientMainLoop();
-            } catch (IOException | ClassNotFoundException | InterruptedException e) {
+            } catch (IOException | ClassNotFoundException e) {
                 notifyConnectionStatusChanged(false);
             }
 
@@ -85,7 +87,6 @@ public class ClientA {
             try {
                 Message message = new Message(MessageType.RESPONSE, data);
                 this.connection.send(message);
-
             } catch (IOException e) {
                 clientConnected = false;
                 System.out.println("Error");
@@ -100,6 +101,12 @@ public class ClientA {
             }
         }
 
+        /**
+         * Метод регистрации клиента на сервере
+         * Получаем хартбит от сервера и отвечаем
+         * @throws IOException
+         * @throws ClassNotFoundException
+         */
         void clientHandshake() throws IOException, ClassNotFoundException {
             while (true) {
                 Message message = connection.receive();
@@ -121,11 +128,17 @@ public class ClientA {
             return UUID.randomUUID().toString();
         }
 
-        void clientMainLoop() throws IOException, ClassNotFoundException, InterruptedException {
+        /**
+         * Метод обрабоки сообщений, получаемых с сервера
+         * @throws IOException
+         * @throws ClassNotFoundException
+         */
+        void clientMainLoop() throws IOException, ClassNotFoundException {
             onShutDownLogic();
             while (true) {
                 Message message = connection.receive();
                 if (message != null && message.getType() != null && message.getType() == MessageType.SERVER_PUSH) {
+                    //Можно обрабатывать асинхронно, для увеличения производительности, не забыть создать отдельный TreadPool!!
                     //CompletableFuture.runAsync(() -> processIncomingMessage(message));
                     processIncomingMessage(message);
                     sendResponse(message.getId());
@@ -135,6 +148,9 @@ public class ClientA {
             }
         }
 
+        /**
+         * Метод создания хука при шатдауне клиента, для удаления клиента из списка доступных на сервере
+         */
         private void onShutDownLogic() {
             final Thread clientThread = Thread.currentThread();
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
