@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
  * Класс сервера, отвечает за регистрацию клиентов и отправку сообщений
  */
 public class Server {
-    private static Map<String, Connection> connectionMap = new ConcurrentHashMap<>();
+    private final static Map<String, Connection> connectionMap = new ConcurrentHashMap<>();
 
     private final ScheduledExecutorService generateMessagesExecutor = Executors.newScheduledThreadPool(1);
 

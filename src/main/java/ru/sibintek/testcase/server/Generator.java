@@ -2,13 +2,17 @@ package ru.sibintek.testcase.server;
 
 import ru.sibintek.testcase.common.Message;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.PriorityBlockingQueue;
 
 /**
@@ -57,36 +61,24 @@ public class Generator implements Runnable {
      * @param tempDir директория для поиска сообщений
      * @return Message
      */
-    //TODO Refactor this ужас
     private Optional<Message> readFirstMessageFromDir(Path tempDir) {
-        Path earliestFile = null;
-        InputStream fis = null;
-        ObjectInputStream ois = null;
-        try {
-            earliestFile = Files.list(tempDir)
-                    .findFirst().orElse(null);
-            if (earliestFile != null) {
-                fis = Files.newInputStream(earliestFile);
-            }
-            ois = new ObjectInputStream(fis);
-            if (earliestFile != null) {
-                earliestFile.toFile().delete();
-            }
+        Path earliestFile = getEarliestFileFromTempDir(tempDir);
+        try (ObjectInputStream ois = new ObjectInputStream(Files.newInputStream(earliestFile))) {
+            earliestFile.toFile()
+                    .delete();
             return Optional.ofNullable((Message) ois.readObject());
         } catch (IOException | ClassNotFoundException e) {
             return Optional.empty();
-        } finally {
-            try {
-                if (ois != null) {
-                    ois.close();
-                }
-                if (fis != null) {
-                    fis.close();
-                }
-            } catch (IOException e) {
-                System.exit(-1);
-                e.printStackTrace();
-            }
+        }
+    }
+
+    private Path getEarliestFileFromTempDir(Path tempDir) {
+        try {
+            return Files.list(tempDir)
+                    .findFirst()
+                    .get();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
